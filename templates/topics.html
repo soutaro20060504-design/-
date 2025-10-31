@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}お題 - 大喜利アプリ{% endblock %}
+
+{% block content %}
+<h1>💡 お題</h1>
+
+<div class="card">
+    <h2>新しいお題を作成</h2>
+    <form method="POST" action="{{ url_for('create_topic') }}">
+        <textarea name="content" rows="3" placeholder="お題を入力してください（例：こんな学校は嫌だ）" required></textarea>
+        
+        <label>
+            <input type="checkbox" name="is_anonymous">
+            匿名で投稿する
+        </label>
+        
+        <button type="submit" class="btn">お題を作成</button>
+    </form>
+</div>
+
+<h2 style="margin-top: 30px; margin-bottom: 20px;">お題一覧</h2>
+
+<div class="grid">
+    {% for topic in topics %}
+    <div class="card">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; min-height: 120px; display: flex; align-items: center; justify-content: center; text-align: center;">
+            <p style="font-size: 1.2em; font-weight: bold;">{{ topic['content'] }}</p>
+        </div>
+        
+        <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center; color: #666; font-size: 0.9em;">
+            <span>
+                {% if topic['is_anonymous'] %}
+                <strong>匿名</strong>
+                {% else %}
+                <strong>作成者:</strong> {{ topic['username'] }}
+                {% endif %}
+            </span>
+            <span>{{ topic['created_at'][:10] }}</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not topics %}
+<div class="card" style="text-align: center; padding: 50px;">
+    <p style="color: #666; font-size: 1.2em;">まだお題がありません</p>
+    <p style="color: #999; margin-top: 10px;">最初のお題を作成しましょう！</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,437 @@
+{% extends "base.html" %}
+
+{% block title %}{{ room['name'] }} - 大喜利アプリ{% endblock %}
+
+{% block extra_css %}
+<style>
+    .player-card {
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .ready-badge {
+        background: #28a745;
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.9em;
+    }
+    
+    .not-ready-badge {
+        background: #6c757d;
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.9em;
+    }
+    
+    .answer-box {
+        background: #f8f9fa;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 15px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .answer-box:hover {
+        border-color: #667eea;
+        transform: scale(1.02);
+    }
+    
+    .answer-box.selected {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+    
+    .timer {
+        font-size: 3em;
+        font-weight: bold;
+        color: #667eea;
+        text-align: center;
+        margin: 20px 0;
+    }
+    
+    .timer.warning {
+        color: #dc3545;
+        animation: pulse 1s infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>🚪 {{ room['name'] }}</h1>
+
+<div id="waiting-area" class="card">
+    <h2>待機中...</h2>
+    <p style="color: #666; margin-bottom: 20px;">3人以上のプレイヤーが準備完了すると自動的にゲームが開始されます</p>
+    
+    <div id="players-list"></div>
+    
+    <div style="text-align: center; margin-top: 20px;">
+        <button id="ready-btn" class="btn">準備完了</button>
+        <a href="{{ url_for('rooms') }}" class="btn btn-secondary" style="margin-left: 10px;">退室</a>
+    </div>
+</div>
+
+<div id="answering-area" class="card" style="display: none;">
+    <h2>回答フェーズ</h2>
+    
+    <div id="topic-display" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 15px; text-align: center; margin-bottom: 20px;">
+        <p style="font-size: 1.8em; font-weight: bold;" id="topic-text"></p>
+        <p style="margin-top: 10px; font-size: 0.9em;" id="topic-creator"></p>
+    </div>
+    
+    <div class="timer" id="timer">2:00</div>
+    
+    <textarea id="answer-input" rows="5" placeholder="あなたの回答を入力してください..." style="margin-bottom: 15px;"></textarea>
+    
+    <div style="text-align: center;">
+        <button id="submit-answer-btn" class="btn">回答を提出</button>
+    </div>
+</div>
+
+<div id="voting-area" class="card" style="display: none;">
+    <h2>投票フェーズ</h2>
+    <p style="color: #666; margin-bottom: 20px;">1位と2位の回答を選んでください（自分の回答には投票できません）</p>
+    
+    <div id="answers-list"></div>
+    
+    <div style="text-align: center; margin-top: 20px;">
+        <p style="margin-bottom: 10px;">
+            <strong>1位:</strong> <span id="first-place-display">未選択</span> | 
+            <strong>2位:</strong> <span id="second-place-display">未選択</span>
+        </p>
+        <button id="submit-vote-btn" class="btn" disabled>投票を確定</button>
+    </div>
+</div>
+
+<div id="results-area" class="card" style="display: none;">
+    <h2>結果発表！</h2>
+    
+    <div id="results-list"></div>
+    
+    <div style="text-align: center; margin-top: 30px;">
+        <button id="continue-btn" class="btn">継続（ポイント引き継ぎ）</button>
+        <button id="new-game-btn" class="btn btn-secondary" style="margin-left: 10px;">新ゲーム（リセット）</button>
+        <button id="end-btn" class="btn btn-danger" style="margin-left: 10px;">終了</button>
+    </div>
+    
+    <div style="margin-top: 20px; text-align: center;">
+        <button id="save-answer-btn" class="btn" style="background: #28a745;">気に入った回答を保存</button>
+    </div>
+</div>
+
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script>
+    const socket = io();
+    const roomId = {{ room['id'] }};
+    let currentState = 'waiting';
+    let timerInterval = null;
+    let myAnswer = '';
+    let allAnswers = [];
+    let selectedFirst = null;
+    let selectedSecond = null;
+    let gameResults = null;
+    
+    // ルームに参加
+    socket.emit('join_room', {room_id: roomId});
+    
+    // プレイヤーリスト更新
+    socket.on('room_update', (data) => {
+        updatePlayersList(data.players);
+        currentState = data.state;
+    });
+    
+    // ゲーム開始
+    socket.on('game_start', (data) => {
+        currentState = 'answering';
+        showAnsweringArea(data);
+        startTimer(data.timer);
+    });
+    
+    // 投票フェーズ
+    socket.on('voting_phase', (data) => {
+        currentState = 'voting';
+        showVotingArea(data.answers);
+    });
+    
+    // 結果表示
+    socket.on('game_results', (data) => {
+        currentState = 'results';
+        gameResults = data;
+        showResults(data);
+    });
+    
+    // ホームへリダイレクト
+    socket.on('redirect_home', () => {
+        window.location.href = '{{ url_for("home") }}';
+    });
+    
+    // 準備完了ボタン
+    document.getElementById('ready-btn').addEventListener('click', () => {
+        socket.emit('ready', {room_id: roomId});
+        document.getElementById('ready-btn').disabled = true;
+        document.getElementById('ready-btn').textContent = '準備完了済み';
+    });
+    
+    // 回答提出
+    document.getElementById('submit-answer-btn').addEventListener('click', () => {
+        const answer = document.getElementById('answer-input').value.trim();
+        if (!answer) {
+            alert('回答を入力してください');
+            return;
+        }
+        myAnswer = answer;
+        socket.emit('submit_answer', {room_id: roomId, answer: answer});
+        document.getElementById('submit-answer-btn').disabled = true;
+        document.getElementById('answer-input').disabled = true;
+        alert('回答を提出しました！他のプレイヤーの回答を待っています...');
+    });
+    
+    // 投票確定
+    document.getElementById('submit-vote-btn').addEventListener('click', () => {
+        if (selectedFirst === null || selectedSecond === null) {
+            alert('1位と2位を選択してください');
+            return;
+        }
+        socket.emit('submit_vote', {
+            room_id: roomId,
+            first_place: selectedFirst,
+            second_place: selectedSecond
+        });
+        document.getElementById('submit-vote-btn').disabled = true;
+        alert('投票しました！他のプレイヤーの投票を待っています...');
+    });
+    
+    // ゲーム継続・終了ボタン
+    document.getElementById('continue-btn').addEventListener('click', () => {
+        socket.emit('game_action', {room_id: roomId, action: 'continue'});
+    });
+    
+    document.getElementById('new-game-btn').addEventListener('click', () => {
+        socket.emit('game_action', {room_id: roomId, action: 'new_game'});
+    });
+    
+    document.getElementById('end-btn').addEventListener('click', () => {
+        if (confirm('本当に終了しますか？')) {
+            socket.emit('game_action', {room_id: roomId, action: 'end'});
+        }
+    });
+    
+    // 回答保存
+    document.getElementById('save-answer-btn').addEventListener('click', () => {
+        if (!gameResults) return;
+        
+        const topic = document.getElementById('topic-text').textContent;
+        let selectedAnswer = prompt('保存したい回答の番号を入力してください（1〜' + gameResults.players.length + '）');
+        
+        if (selectedAnswer) {
+            const idx = parseInt(selectedAnswer) - 1;
+            if (idx >= 0 && idx < gameResults.players.length) {
+                fetch('{{ url_for("add_to_storage") }}', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        topic: topic,
+                        answer: gameResults.players[idx].answer,
+                        answer_owner: gameResults.players[idx].username
+                    })
+                }).then(r => r.json()).then(data => {
+                    if (data.success) {
+                        alert('回答を保存しました！');
+                    }
+                });
+            }
+        }
+    });
+    
+    function updatePlayersList(players) {
+        const list = document.getElementById('players-list');
+        list.innerHTML = '<h3 style="margin-bottom: 15px;">参加者 (' + players.length + '人)</h3>';
+        
+        players.forEach(player => {
+            const card = document.createElement('div');
+            card.className = 'player-card';
+            card.innerHTML = `
+                <span style="font-weight: bold;">${player.username}</span>
+                <span class="${player.ready ? 'ready-badge' : 'not-ready-badge'}">
+                    ${player.ready ? '準備完了' : '待機中'}
+                </span>
+            `;
+            list.appendChild(card);
+        });
+    }
+    
+    function showAnsweringArea(data) {
+        document.getElementById('waiting-area').style.display = 'none';
+        document.getElementById('answering-area').style.display = 'block';
+        document.getElementById('voting-area').style.display = 'none';
+        document.getElementById('results-area').style.display = 'none';
+        
+        document.getElementById('topic-text').textContent = data.topic.content;
+        if (data.topic.is_anonymous) {
+            document.getElementById('topic-creator').textContent = '匿名';
+        } else {
+            document.getElementById('topic-creator').textContent = '作成者: ' + (data.topic.username || '不明');
+        }
+    }
+    
+    function startTimer(endTime) {
+        if (timerInterval) clearInterval(timerInterval);
+        
+        timerInterval = setInterval(() => {
+            const now = Date.now() / 1000;
+            const remaining = Math.max(0, endTime - now);
+            
+            const minutes = Math.floor(remaining / 60);
+            const seconds = Math.floor(remaining % 60);
+            
+            const timerEl = document.getElementById('timer');
+            timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            
+            if (remaining < 30) {
+                timerEl.classList.add('warning');
+            }
+            
+            if (remaining <= 0) {
+                clearInterval(timerInterval);
+                if (currentState === 'answering' && !document.getElementById('submit-answer-btn').disabled) {
+                    document.getElementById('submit-answer-btn').click();
+                }
+            }
+        }, 1000);
+    }
+    
+    function showVotingArea(answers) {
+        if (timerInterval) clearInterval(timerInterval);
+        
+        document.getElementById('waiting-area').style.display = 'none';
+        document.getElementById('answering-area').style.display = 'none';
+        document.getElementById('voting-area').style.display = 'block';
+        document.getElementById('results-area').style.display = 'none';
+        
+        allAnswers = answers;
+        const list = document.getElementById('answers-list');
+        list.innerHTML = '';
+        
+        answers.forEach((answer, idx) => {
+            const box = document.createElement('div');
+            box.className = 'answer-box';
+            box.innerHTML = `
+                <strong>回答 ${idx + 1}</strong>
+                <p style="margin-top: 10px; font-size: 1.1em;">${answer}</p>
+            `;
+            
+            // 自分の回答をチェック
+            if (answer === myAnswer) {
+                box.style.opacity = '0.5';
+                box.style.cursor = 'not-allowed';
+                box.innerHTML += '<p style="margin-top: 10px; color: #dc3545;"><strong>あなたの回答</strong></p>';
+            } else {
+                box.addEventListener('click', () => selectAnswer(idx, box));
+            }
+            
+            list.appendChild(box);
+        });
+    }
+    
+    function selectAnswer(idx, element) {
+        if (allAnswers[idx] === myAnswer) return;
+        
+        if (selectedFirst === null) {
+            selectedFirst = idx;
+            element.classList.add('selected');
+            element.innerHTML += '<p style="margin-top: 10px;"><strong>1位に選択</strong></p>';
+            document.getElementById('first-place-display').textContent = `回答 ${idx + 1}`;
+        } else if (selectedSecond === null && idx !== selectedFirst) {
+            selectedSecond = idx;
+            element.classList.add('selected');
+            element.innerHTML += '<p style="margin-top: 10px;"><strong>2位に選択</strong></p>';
+            document.getElementById('second-place-display').textContent = `回答 ${idx + 1}`;
+            document.getElementById('submit-vote-btn').disabled = false;
+        } else {
+            // リセット
+            document.querySelectorAll('.answer-box').forEach(box => {
+                box.classList.remove('selected');
+            });
+            selectedFirst = null;
+            selectedSecond = null;
+            document.getElementById('first-place-display').textContent = '未選択';
+            document.getElementById('second-place-display').textContent = '未選択';
+            document.getElementById('submit-vote-btn').disabled = true;
+            
+            // 再レンダリング
+            showVotingArea(allAnswers);
+        }
+    }
+    
+    function showResults(data) {
+        document.getElementById('waiting-area').style.display = 'none';
+        document.getElementById('answering-area').style.display = 'none';
+        document.getElementById('voting-area').style.display = 'none';
+        document.getElementById('results-area').style.display = 'block';
+        
+        const list = document.getElementById('results-list');
+        list.innerHTML = '';
+        
+        // プレイヤーを累計ポイント順にソート
+        const sortedPlayers = [...data.players].sort((a, b) => 
+            data.cumulative_points[b.user_id] - data.cumulative_points[a.user_id]
+        );
+        
+        sortedPlayers.forEach((player, rank) => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            
+            let rankEmoji = '';
+            if (rank === 0) rankEmoji = '🥇';
+            else if (rank === 1) rankEmoji = '🥈';
+            else if (rank === 2) rankEmoji = '🥉';
+            else rankEmoji = `${rank + 1}位`;
+            
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="color: #667eea;">${rankEmoji} ${player.username}</h3>
+                    <div style="font-size: 1.5em; font-weight: bold; color: #ffc107;">
+                        ${data.cumulative_points[player.user_id]}pt
+                    </div>
+                </div>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                    <p style="font-size: 1.1em;">${player.answer || '回答なし'}</p>
+                </div>
+            `;
+            
+            list.appendChild(card);
+        });
+        
+        // 勝者を強調
+        if (data.winner) {
+            list.insertAdjacentHTML('afterbegin', `
+                <div style="background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%); color: #333; padding: 30px; border-radius: 15px; text-align: center; margin-bottom: 30px;">
+                    <h2 style="font-size: 2.5em; margin-bottom: 10px;">🎉 ${data.winner.username} の勝利！ 🎉</h2>
+                    <p style="font-size: 1.3em;">${data.cumulative_points[data.winner.user_id]} ポイント獲得</p>
+                </div>
+            `);
+        }
+    }
+    
+    // ページ離脱時にルームから退出
+    window.addEventListener('beforeunload', () => {
+        socket.emit('leave_room', {room_id: roomId});
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}ユーザー一覧 - 大喜利アプリ{% endblock %}
+
+{% block content %}
+<h1>👥 ユーザー一覧</h1>
+
+<div class="grid">
+    {% for u in users %}
+    <div class="card" style="cursor: pointer;" onclick="window.location.href='{{ url_for('user_profile', user_id=u['id']) }}'">
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <img src="{{ url_for('static', filename='uploads/' + u['image']) }}" 
+                 alt="{{ u['username'] }}" 
+                 style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 3px solid #667eea;"
+                 onerror="this.src='{{ url_for('static', filename='uploads/default.png') }}'">
+            
+            <div style="flex: 1;">
+                <h3 style="color: #667eea; margin-bottom: 5px;">{{ u['username'] }}</h3>
+                <p style="color: #666; font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {{ u['bio'][:50] or 'よろしくお願いします！' }}
+                </p>
+            </div>
+        </div>
+        
+        {% if u['show_stats'] %}
+        <div style="display: flex; gap: 15px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 0.9em;">
+            <div>
+                <strong style="color: #667eea;">試合:</strong> {{ u['battles'] }}
+            </div>
+            <div>
+                <strong style="color: #28a745;">勝利:</strong> {{ u['wins'] }}
+            </div>
+            <div>
+                <strong style="color: #ffc107;">Pt:</strong> {{ u['total_points'] }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+{% if not users %}
+<div class="card" style="text-align: center; padding: 50px;">
+    <p style="color: #666; font-size: 1.2em;">まだユーザーがいません</p>
+</div>
+{% endif %}
+{% endblock %}

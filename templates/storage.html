@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}個人倉庫 - 大喜利アプリ{% endblock %}
+
+{% block content %}
+<h1>📦 個人倉庫</h1>
+
+<div class="card">
+    <p style="color: #666;">お気に入りの回答を保存しておく場所です。ゲーム中に保存ボタンを押すと追加されます。</p>
+</div>
+
+{% for item in items %}
+<div class="card">
+    <div style="background: #667eea; color: white; padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+        <strong>お題:</strong> {{ item['topic'] }}
+    </div>
+    
+    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 10px;">
+        <p style="font-size: 1.1em; margin-bottom: 10px;">{{ item['answer'] }}</p>
+        <p style="color: #666; font-size: 0.9em;">
+            回答者: <strong>{{ item['answer_owner'] or '匿名' }}</strong>
+        </p>
+    </div>
+    
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="color: #999; font-size: 0.9em;">
+            保存日時: {{ item['saved_at'] }}
+        </span>
+        <a href="{{ url_for('delete_from_storage', item_id=item['id']) }}" 
+           class="btn btn-danger"
+           onclick="return confirm('この回答を削除しますか？')">削除</a>
+    </div>
+</div>
+{% endfor %}
+
+{% if not items %}
+<div class="card" style="text-align: center; padding: 50px;">
+    <p style="color: #666; font-size: 1.2em;">まだ保存された回答がありません</p>
+    <p style="color: #999; margin-top: 10px;">ゲーム中に気に入った回答を保存しましょう！</p>
+</div>
+{% endif %}
+{% endblock %}

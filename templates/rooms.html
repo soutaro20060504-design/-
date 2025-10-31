@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}ルーム - 大喜利アプリ{% endblock %}
+
+{% block content %}
+<h1>🚪 ルーム</h1>
+
+<div class="card">
+    <h2>新しいルームを作成</h2>
+    <form method="POST" action="{{ url_for('create_room') }}">
+        <input type="text" name="room_name" placeholder="ルーム名を入力してください" required>
+        <button type="submit" class="btn">ルームを作成</button>
+    </form>
+</div>
+
+<h2 style="margin-top: 30px; margin-bottom: 20px;">ルーム一覧</h2>
+
+<div class="grid">
+    {% for room in rooms %}
+    <div class="card" style="cursor: pointer; transition: transform 0.2s;" 
+         onclick="window.location.href='{{ url_for('game_room', room_id=room['id']) }}'"
+         onmouseover="this.style.transform='scale(1.02)'"
+         onmouseout="this.style.transform='scale(1)'">
+        
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 10px; text-align: center;">
+            <h3 style="font-size: 1.5em; margin-bottom: 10px;">{{ room['name'] }}</h3>
+            <p style="font-size: 2em; font-weight: bold;">👥 {{ room['player_count'] }}人</p>
+        </div>
+        
+        <div style="margin-top: 15px; color: #666; text-align: center;">
+            <p><strong>作成者:</strong> {{ room['creator_name'] }}</p>
+        </div>
+        
+        <div style="margin-top: 15px; text-align: center;">
+            <span class="btn" style="display: inline-block;">入室する</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not rooms %}
+<div class="card" style="text-align: center; padding: 50px;">
+    <p style="color: #666; font-size: 1.2em;">まだルームがありません</p>
+    <p style="color: #999; margin-top: 10px;">最初のルームを作成しましょう！</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}ログイン - 大喜利アプリ{% endblock %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 50px auto;">
+    <h1>🎭 大喜利アプリ</h1>
+    
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+    
+    <div class="card">
+        <h2>ログイン</h2>
+        <form method="POST">
+            <input type="text" name="username" placeholder="ユーザー名" required>
+            <input type="password" name="password" placeholder="パスワード" required>
+            <button type="submit" class="btn" style="width: 100%;">ログイン</button>
+        </form>
+    </div>
+    
+    <div style="text-align: center; margin-top: 20px;">
+        <p>アカウントをお持ちでないですか？</p>
+        <a href="{{ url_for('register') }}" class="btn" style="display: inline-block; margin-top: 10px;">新規登録</a>
+    </div>
+</div>
+{% endblock %}
