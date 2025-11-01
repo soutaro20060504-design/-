@@ -17,9 +17,10 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 # データベース初期化
 def init_db():
-    conn = sqlite3.connect('oogiri.db')
+    db_path = os.path.join('/tmp', 'oogiri.db')
+    conn = sqlite3.connect(db_path)
     c = conn.cursor()
-    
+  
     # ユーザーテーブル
     c.execute('''CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,7 +86,8 @@ game_rooms = {}
 
 # ヘルパー関数
 def get_db():
-    conn = sqlite3.connect('oogiri.db')
+    db_path = os.path.join('/tmp', 'oogiri.db')
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
