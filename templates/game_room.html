@@ -148,8 +148,12 @@
     let gameResults = null;
     
     // ルームに参加
-    socket.emit('join_room', {room_id: roomId});
-    
+    socket.emit('join_room', {
+    room_id: roomId,
+    user_id: {{ session.user_id }},
+    username: "{{ session.username }}"
+});    
+
     // プレイヤーリスト更新
     socket.on('room_update', (data) => {
         updatePlayersList(data.players);
@@ -183,7 +187,10 @@
     
     // 準備完了ボタン
     document.getElementById('ready-btn').addEventListener('click', () => {
-        socket.emit('ready', {room_id: roomId});
+        socket.emit('ready', {
+    room_id: roomId,
+    user_id: {{ session.user_id }}
+});
         document.getElementById('ready-btn').disabled = true;
         document.getElementById('ready-btn').textContent = '準備完了済み';
     });
@@ -196,7 +203,11 @@
             return;
         }
         myAnswer = answer;
-        socket.emit('submit_answer', {room_id: roomId, answer: answer});
+        socket.emit('submit_answer', {
+    room_id: roomId,
+    user_id: {{ session.user_id }},
+    answer: answer
+});
         document.getElementById('submit-answer-btn').disabled = true;
         document.getElementById('answer-input').disabled = true;
         alert('回答を提出しました！他のプレイヤーの回答を待っています...');
@@ -208,30 +219,40 @@
             alert('1位と2位を選択してください');
             return;
         }
+
         socket.emit('submit_vote', {
-            room_id: roomId,
-            first_place: selectedFirst,
-            second_place: selectedSecond
-        });
+    room_id: roomId,
+    user_id: {{ session.user_id }},
+    first_place: selectedFirst,
+    second_place: selectedSecond
+});
+
         document.getElementById('submit-vote-btn').disabled = true;
         alert('投票しました！他のプレイヤーの投票を待っています...');
     });
     
     // ゲーム継続・終了ボタン
     document.getElementById('continue-btn').addEventListener('click', () => {
-        socket.emit('game_action', {room_id: roomId, action: 'continue'});
-    });
-    
+
+        socket.emit('game_action', {
+    room_id: roomId,
+    user_id: {{ session.user_id }},
+    action: 'continue' // または 'new_game', 'end'
+});    
     document.getElementById('new-game-btn').addEventListener('click', () => {
-        socket.emit('game_action', {room_id: roomId, action: 'new_game'});
-    });
-    
+
+        socket.emit('game_action', {
+    room_id: roomId,
+    user_id: {{ session.user_id }},
+    action: 'continue' // または 'new_game', 'end'
+});
     document.getElementById('end-btn').addEventListener('click', () => {
         if (confirm('本当に終了しますか？')) {
-            socket.emit('game_action', {room_id: roomId, action: 'end'});
-        }
-    });
-    
+            socket.emit('game_action', {
+    room_id: roomId,
+    user_id: {{ session.user_id }},
+    action: 'continue' // または 'new_game', 'end'
+});   
     // 回答保存
     document.getElementById('save-answer-btn').addEventListener('click', () => {
         if (!gameResults) return;
@@ -431,7 +452,10 @@
     
     // ページ離脱時にルームから退出
     window.addEventListener('beforeunload', () => {
-        socket.emit('leave_room', {room_id: roomId});
-    });
+
+        socket.emit('leave_room', {
+    room_id: roomId,
+    user_id: {{ session.user_id }}
+});
 </script>
 {% endblock %}

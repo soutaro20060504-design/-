@@ -15,6 +15,10 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB max
 
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# この2行を追加
+from flask_socketio import join_room, leave_room
+socketio.init_app(app, manage_session=False)
+
 # データベース初期化
 def init_db():
     db_path = os.path.join('/tmp', 'oogiri.db')
@@ -365,10 +369,13 @@ def game_room(room_id):
 # SocketIO イベント
 @socketio.on('join_room')
 def on_join(data):
+    from flask import request
     room_id = str(data['room_id'])
-    user_id = session.get('user_id')
-    username = session.get('username')
     
+    # sessionの代わりにdataから取得
+    user_id = data.get('user_id') or session.get('user_id')
+    username = data.get('username') or session.get('username')
+   
     if not user_id or not username:
         return
     
