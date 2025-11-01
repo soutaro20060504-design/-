@@ -608,7 +608,9 @@ def on_game_action(data):
     elif action == 'continue':
         # ポイント引き継いで次のお題へ
         start_game(room_id)
+# アプリ起動時に必ずDBを初期化
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, debug=False, host='0.0.0.0', port=port)
